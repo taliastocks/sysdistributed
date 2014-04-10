@@ -1,0 +1,21 @@
+#!/bin/sh
+
+case "$1" in
+    run-node | subscribe-node | mirror | unmirror | notify)
+        $SYSDISTRIBUTED/bin/$@
+        ;;
+    *)
+        echo "Usage: sysdistributed internal COMMAND [ARGUMENTS]" >&2
+        echo "    Commands:" >&2
+        echo "        run-node    Run a shell command from a particular node." >&2
+        echo "        subscribe-node" >&2
+        echo "                    Subscribe to the 'upness' of a node." >&2
+        echo "        mirror      Mirror a virtual file to this node." >&2
+        echo "        unmirror    Notify others that we no longer mirror a" >&2
+        echo "                    particular virtual file." >&2
+        echo "        notify      Notify subscribers that a virtual file has" >&2
+        echo "                    changed." >&2
+        false; exit
+        ;;
+esac
+

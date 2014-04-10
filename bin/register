@@ -1,0 +1,90 @@
+#!/usr/bin/python3
+
+import sys
+import os
+import re
+
+from utilities import *
+
+
+def usage ():
+    print('Usage: register NODE', file=sys.stderr)
+    print('   Create and register a node.', file=sys.stderr)
+    node_usage()
+    exit(1)
+
+
+
+if len(sys.argv) != 2:
+    print('Incorrect number of arguments.', file=sys.stderr)
+    usage()
+
+
+if not os.path.exists(os.path.join(SYSDISTRIBUTED, 'key')):
+    print("Generating public/private keypair.")
+    execute('ssh-keygen',
+        '-t', 'rsa',
+        '-b', '2048',
+        '-f', os.path.join(SYSDISTRIBUTED, 'key'),
+        '-N', '').wait()
+
+
+node = sys.argv[1]
+address = decode_node(node)
+if not address:
+    print('Invalid node address.', file=sys.stderr)
+    usage()
+user, host, port, directory = address
+
+
+def ensure (truth):
+    if not truth:
+        print('Failure!')
+        exit(1)
+
+
+print("Registering public key with remote server.")
+ensure(
+    execute('ssh-copy-id',
+        '-i', os.path.join(SYSDISTRIBUTED, 'key.pub'),
+        '-p', str(port),
+        '%s@%s' % (user, host)
+    ).wait() == 0
+)
+
+print("Testing if key registration worked.")
+ensure(
+    execute('ssh',
+        '-i', os.path.join(SYSDISTRIBUTED, 'key'),
+        '-p', str(port),
+        '%s@%s' % (user, host),
+        '-o', 'PreferredAuthentications=publickey',
+        'true'
+    ).wait() == 0
+)
+
+
+def transfer (fname, path):
+    ensure(copy_to_node(node, fname, open(path)))
+
+
+print("Copying private key.")
+transfer('$SYSDISTRIBUTED/key',
+    os.path.join(SYSDISTRIBUTED, 'key'))
+print("Copying public key.")
+transfer('$SYSDISTRIBUTED/key.pub',
+    os.path.join(SYSDISTRIBUTED, 'key.pub'))
+
+files = os.listdir(os.path.join(SYSDISTRIBUTED, 'bin'))
+files = [fname for fname in files if re.match(r'^[a-zA-Z\-]+$', fname) != None]
+
+for fname in files:
+    print("Copying", fname)
+    path = os.path.join(SYSDISTRIBUTED, 'bin', fname)
+    transfer('$SYSDISTRIBUTED/bin/' + fname, path)
+
+
+print("Success!")
+exit(0)
+
+

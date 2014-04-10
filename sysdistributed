@@ -1,0 +1,19 @@
+#!/bin/sh
+
+: ${SYSDISTRIBUTED?"Need to set SYSDISTRIBUTED environment variable."}
+
+case "$1" in
+    internal | register | subscribe | run)
+        $SYSDISTRIBUTED/bin/$@
+        ;;
+    *)
+        echo "Usage: sysdistributed COMMAND [ARGUMENTS]" >&2
+        echo "    Commands:" >&2
+        echo "        internal    Access internal commands." >&2
+        echo "        register    Register a new node with the network." >&2
+        echo "        subscribe   Subscribe to changes in a virtual file." >&2
+        echo "        run         Run a command on virtual files." >&2
+        false; exit
+        ;;
+esac
+

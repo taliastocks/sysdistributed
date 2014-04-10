@@ -1,0 +1,7 @@
+
+*~
+key
+key.pub
+*.pyc
+__pycache__
+
