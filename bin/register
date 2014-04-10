@@ -59,6 +59,7 @@ ensure(
         '-p', str(port),
         '%s@%s' % (user, host),
         '-o', 'PreferredAuthentications=publickey',
+        '-o', 'IdentitiesOnly=yes',
         'true'
     ).wait() == 0
 )
