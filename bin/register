@@ -31,6 +31,9 @@ if not os.path.exists(os.path.join(SYSDISTRIBUTED, 'key')):
 
 
 node = sys.argv[1]
+
+print("Attempting to register", node, '...')
+
 address = decode_node(node)
 if not address:
     print('Invalid node address.', file=sys.stderr)
@@ -52,7 +55,7 @@ def ensure (truth):
 # anyway, so can act as their own timeout.
 print("Checking if remote server is reachable ...")
 sock = socket.socket()
-sock.settimeout(5)
+sock.settimeout(10)
 try:
     sock.connect((host, int(port)))
     ensure(
