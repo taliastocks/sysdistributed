@@ -4,4 +4,5 @@ key
 key.pub
 *.pyc
 __pycache__
+config.sh
 

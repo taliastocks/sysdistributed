@@ -2,6 +2,7 @@
 
 import sys
 import os
+import socket
 import re
 
 from utilities import *
@@ -43,7 +44,27 @@ def ensure (truth):
         exit(1)
 
 
-print("Registering public key with remote server.")
+# Must check if the remote server is reachable, because otherwise
+# ssh-copy-id just hangs for a long time without giving an error.
+# Obviously, the server could go down in between this check and
+# running ssh-copy-id, but this should fix the majority of cases,
+# and at any rate a human should be running this script manually
+# anyway, so can act as their own timeout.
+print("Checking if remote server is reachable ...")
+sock = socket.socket()
+sock.settimeout(5)
+try:
+    sock.connect((host, int(port)))
+    ensure(
+        sock.recv(100).lower().startswith(b'ssh')
+    )
+except socket.timeout:
+    ensure(False)
+finally:
+    sock.close()
+
+
+print("Registering public key with remote server ...")
 ensure(
     execute('ssh-copy-id',
         '-i', os.path.join(SYSDISTRIBUTED, 'key.pub'),
@@ -52,7 +73,7 @@ ensure(
     ).wait() == 0
 )
 
-print("Testing if key registration worked.")
+print("Testing if key registration worked ...")
 ensure(
     execute('ssh',
         '-i', os.path.join(SYSDISTRIBUTED, 'key'),
@@ -65,24 +86,24 @@ ensure(
 )
 
 
-def transfer (fname, path):
-    ensure(copy_to_node(node, fname, open(path)))
+print("Copying private key ...")
+copy_to_node(node, '$SYSDISTRIBUTED/key',
+    open(os.path.join(SYSDISTRIBUTED, 'key')), '600')
+print("Copying public key ...")
+copy_to_node(node, '$SYSDISTRIBUTED/key.pub',
+    open(os.path.join(SYSDISTRIBUTED, 'key.pub')))
 
-
-print("Copying private key.")
-transfer('$SYSDISTRIBUTED/key',
-    os.path.join(SYSDISTRIBUTED, 'key'))
-print("Copying public key.")
-transfer('$SYSDISTRIBUTED/key.pub',
-    os.path.join(SYSDISTRIBUTED, 'key.pub'))
+print("Copying sysdistributed ...")
+copy_to_node(node, '$SYSDISTRIBUTED/sysdistributed',
+    open(os.path.join(SYSDISTRIBUTED, 'sysdistributed')))
 
 files = os.listdir(os.path.join(SYSDISTRIBUTED, 'bin'))
 files = [fname for fname in files if re.match(r'^[a-zA-Z\-]+$', fname) != None]
 
 for fname in files:
-    print("Copying", fname)
+    print("Copying", fname, '...')
     path = os.path.join(SYSDISTRIBUTED, 'bin', fname)
-    transfer('$SYSDISTRIBUTED/bin/' + fname, path)
+    copy_to_node(node, '$SYSDISTRIBUTED/bin/' + fname, open(path))
 
 
 print("Success!")

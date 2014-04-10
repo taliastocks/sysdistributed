@@ -37,12 +37,16 @@ def execute (command, *argv,
     return proc
 
 
-def copy_to_node (node, fname, content):
+def copy_to_node (node, fname, content, permissions=None):
     if type(content) == str:
         content = bytes(content, 'utf-8')
     remotesum = b''
     localsum = b''
-    command = 'cat >"%s"; sha512sum <"%s"' % (fname, fname)
+    if permissions == None:
+        command = 'cat >"%s"; sha512sum <"%s"' % (fname, fname)
+    else:
+        command = 'cat >"%s"; chmod %s "%s"; sha512sum <"%s"' % \
+            (fname, permissions, fname, fname)
     if hasattr(content, 'fileno'): # Is an open file.
         content.seek(0)
         remotesum, _ = execute('run-node', node, command,
