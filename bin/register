@@ -101,42 +101,31 @@ ensure(
 )
 print('.', end='', flush=True)
 
-ensure(
-    copy_to_node(node, '$SYSDISTRIBUTED/key',
-        open(os.path.join(SYSDISTRIBUTED, 'key')), '600'),
-    "Failed to copy private key."
-)
-print('.', end='', flush=True)
-ensure(
-    copy_to_node(node, '$SYSDISTRIBUTED/key.pub',
-        open(os.path.join(SYSDISTRIBUTED, 'key.pub'))),
-    "Failed to copy public key."
-)
-print('.', end='', flush=True)
 
-ensure(
-    copy_to_node(node, '$SYSDISTRIBUTED/sysdistributed',
-        open(os.path.join(SYSDISTRIBUTED, 'sysdistributed'))),
-    "Failed to copy sysdistributed."
-)
-print('.', end='', flush=True)
 
+localtar = execute('tar', '-pcz', '--null', '-T',
+    '/dev/stdin', '-C', SYSDISTRIBUTED,
+    stdin=PIPE, stdout=PIPE)
+remotetar = execute('run-node', node, "tar -pxz", stdin=localtar.stdout)
+
+localtar.stdin.write(b'key\0')
+localtar.stdin.write(b'key.pub\0')
+localtar.stdin.write(b'sysdistributed\0')
 files = os.listdir(os.path.join(SYSDISTRIBUTED, 'bin'))
-files = [fname for fname in files if re.match(r'^[a-zA-Z\-]+$', fname) != None]
-
+files = (fname for fname in files if re.match(r'^[a-zA-Z\-]+$', fname) != None)
+for fname in files:
+    localtar.stdin.write(('bin/%s\0' % fname).encode('utf-8'))
+localtar.stdin.close()
 ensure(
-    execute('run-node', node, 'mkdir -p $SYSDISTRIBUTED/bin').wait() == 0,
-    "Could not create bin directory."
+    localtar.wait() == 0,
+    "Could not compress and send files."
+)
+ensure(
+    remotetar.wait() == 0,
+    "Remote could not receive and decompress sent files."
 )
 print('.', end='', flush=True)
 
-for fname in files:
-    path = os.path.join(SYSDISTRIBUTED, 'bin', fname)
-    ensure(
-        copy_to_node(node, '$SYSDISTRIBUTED/bin/' + fname, open(path)),
-        "Failed to copy bin/%s" % fname
-    )
-    print('.', end='', flush=True)
 
 
 ensure(
@@ -145,10 +134,13 @@ ensure(
 )
 print('.', end='', flush=True)
 
+
+
 # Append node to list of nodes, and copy node list to other node.
 with open(os.path.join(SYSDISTRIBUTED, 'nodes'), 'ab') as f:
     f.write(("%s\n" % node).encode('utf-8'))
 print('.', end='', flush=True)
+# TODO: Check if node is already in this list?
 
 # TODO: Tell other nodes about new node?
 
