@@ -94,6 +94,14 @@ else:
 
 
 ensure(
+    remote_execute(user, host, port,
+        'mkdir -p "%s"' % directory
+    ),
+    "Could not create directory on new node."
+)
+print('.', end='', flush=True)
+
+ensure(
     copy_to_node(node, '$SYSDISTRIBUTED/key',
         open(os.path.join(SYSDISTRIBUTED, 'key')), '600'),
     "Failed to copy private key."
@@ -116,6 +124,12 @@ print('.', end='', flush=True)
 files = os.listdir(os.path.join(SYSDISTRIBUTED, 'bin'))
 files = [fname for fname in files if re.match(r'^[a-zA-Z\-]+$', fname) != None]
 
+ensure(
+    execute('run-node', node, 'mkdir -p $SYSDISTRIBUTED/bin').wait() == 0,
+    "Could not create bin directory."
+)
+print('.', end='', flush=True)
+
 for fname in files:
     path = os.path.join(SYSDISTRIBUTED, 'bin', fname)
     ensure(
@@ -124,6 +138,19 @@ for fname in files:
     )
     print('.', end='', flush=True)
 
+
+ensure(
+    execute('run-node', node, "echo %s >self" % node).wait() == 0,
+    "Failed to tell node who it is."
+)
+print('.', end='', flush=True)
+
+# Append node to list of nodes, and copy node list to other node.
+with open(os.path.join(SYSDISTRIBUTED, 'nodes'), 'ab') as f:
+    f.write(("%s\n" % node).encode('utf-8'))
+print('.', end='', flush=True)
+
+# TODO: Tell other nodes about new node?
 
 print("success!")
 exit(0)

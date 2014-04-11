@@ -29,21 +29,15 @@ user, host, port, directory = address
 
 command = ' '.join(sys.argv[2:])
 
-proc = execute('ssh',
-    '-i', os.path.join(SYSDISTRIBUTED, 'key'),
-    '-p', str(port),
-    '%s@%s' % (user, host),
-    '-o', 'PreferredAuthentications=publickey',
-    '-o', 'IdentitiesOnly=yes',
+proc = remote_execute(user, host, port,
     "sh -c '"
         "if export SYSDISTRIBUTED=\"%s\" && "
-            "mkdir -p $SYSDISTRIBUTED/bin && "
-            "cd \"%s\"\n"
+            "cd $SYSDISTRIBUTED\n"
         "then\n"
                 "%s\n"
         "fi\n"
-    "'" % (directory, directory, command),
-    )
+    "'" % (directory, command),
+)
 
 exit(proc.wait())
 
