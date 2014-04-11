@@ -1,0 +1,18 @@
+#!/usr/bin/python3
+
+import sys
+import fcntl
+
+if len(sys.argv) < 2:
+    printf("Needs at least two arguments.", file=sys.stderr)
+    exit(1)
+
+with open(sys.argv[1], 'wb') as f:
+    fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+    for line in sys.stdin:
+        f.truncate(0)
+        f.seek(0)
+        f.write(line.encode('utf-8'))
+        f.flush()
+
+
