@@ -32,7 +32,7 @@ if not os.path.exists(os.path.join(SYSDISTRIBUTED, 'key')):
 
 node = sys.argv[1]
 
-print("Attempting to register", node, '...')
+print("Attempting to register %s..." % node, end='', flush=True)
 
 address = decode_node(node)
 if not address:
@@ -41,75 +41,91 @@ if not address:
 user, host, port, directory = address
 
 
-def ensure (truth):
+def ensure (truth, message = None):
     if not truth:
-        print('Failure!')
+        print('failure!')
+        if message != None:
+            print(message)
         exit(1)
 
 
-# Must check if the remote server is reachable, because otherwise
-# ssh-copy-id just hangs for a long time without giving an error.
-# Obviously, the server could go down in between this check and
-# running ssh-copy-id, but this should fix the majority of cases,
-# and at any rate a human should be running this script manually
-# anyway, so can act as their own timeout.
-print("Checking if remote server is reachable ...")
+# Check if the server is reachable and is running ssh on this port.
+# Obviously, the server could go down between this check and any of the
+# subsequent steps, but this check should solve the majority of problems
+# and give useful diagnostics (i.e. by identifying the reason subsequent
+# steps would fail).
 sock = socket.socket()
 sock.settimeout(10)
 try:
     sock.connect((host, int(port)))
     ensure(
-        sock.recv(100).lower().startswith(b'ssh')
+        sock.recv(100).lower().startswith(b'ssh'),
+        "Not an ssh server."
     )
 except socket.timeout:
-    ensure(False)
+    ensure(False, "Remote server unreachable.")
+except socket.gaierror:
+    ensure(False, "Could not find address associated with hostname.")
 finally:
     sock.close()
+print('.', end='', flush=True)
 
 
-print("Registering public key with remote server ...")
+if not test_ssh(user, host, port):
+    ensure(
+        execute('ssh',
+            '-p', str(port),
+            '%s@%s' % (user, host),
+            "sh -c '"
+                "cat >>~/.ssh/authorized_keys"
+            "'",
+            stdin=open(os.path.join(SYSDISTRIBUTED, 'key.pub'))
+        ).wait() == 0,
+        "Failed to register key with the remote server."
+    )
+    print('.', end='', flush=True)
+    ensure(
+        test_ssh(user, host, port),
+        "Key registration with the remote server did not work."
+    )
+    print('.', end='', flush=True)
+else:
+    print('..', end='', flush=True)
+
+
 ensure(
-    execute('ssh-copy-id',
-        '-i', os.path.join(SYSDISTRIBUTED, 'key.pub'),
-        '-p', str(port),
-        '%s@%s' % (user, host)
-    ).wait() == 0
+    copy_to_node(node, '$SYSDISTRIBUTED/key',
+        open(os.path.join(SYSDISTRIBUTED, 'key')), '600'),
+    "Failed to copy private key."
 )
-
-print("Testing if key registration worked ...")
+print('.', end='', flush=True)
 ensure(
-    execute('ssh',
-        '-i', os.path.join(SYSDISTRIBUTED, 'key'),
-        '-p', str(port),
-        '%s@%s' % (user, host),
-        '-o', 'PreferredAuthentications=publickey',
-        '-o', 'IdentitiesOnly=yes',
-        'true'
-    ).wait() == 0
+    copy_to_node(node, '$SYSDISTRIBUTED/key.pub',
+        open(os.path.join(SYSDISTRIBUTED, 'key.pub'))),
+    "Failed to copy public key."
 )
+print('.', end='', flush=True)
 
-
-print("Copying private key ...")
-copy_to_node(node, '$SYSDISTRIBUTED/key',
-    open(os.path.join(SYSDISTRIBUTED, 'key')), '600')
-print("Copying public key ...")
-copy_to_node(node, '$SYSDISTRIBUTED/key.pub',
-    open(os.path.join(SYSDISTRIBUTED, 'key.pub')))
-
-print("Copying sysdistributed ...")
-copy_to_node(node, '$SYSDISTRIBUTED/sysdistributed',
-    open(os.path.join(SYSDISTRIBUTED, 'sysdistributed')))
+ensure(
+    copy_to_node(node, '$SYSDISTRIBUTED/sysdistributed',
+        open(os.path.join(SYSDISTRIBUTED, 'sysdistributed'))),
+    "Failed to copy sysdistributed."
+)
+print('.', end='', flush=True)
 
 files = os.listdir(os.path.join(SYSDISTRIBUTED, 'bin'))
 files = [fname for fname in files if re.match(r'^[a-zA-Z\-]+$', fname) != None]
 
 for fname in files:
-    print("Copying", fname, '...')
     path = os.path.join(SYSDISTRIBUTED, 'bin', fname)
-    copy_to_node(node, '$SYSDISTRIBUTED/bin/' + fname, open(path))
+    ensure(
+        copy_to_node(node, '$SYSDISTRIBUTED/bin/' + fname, open(path)),
+        "Failed to copy bin/%s" % fname
+    )
+    print('.', end='', flush=True)
 
 
-print("Success!")
+print("success!")
 exit(0)
 
 

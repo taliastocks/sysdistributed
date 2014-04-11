@@ -6,7 +6,7 @@ import subprocess
 from subprocess import PIPE
 
 __all__ = ['execute', 'node_usage', 'copy_to_node', 'SYSDISTRIBUTED',
-    'decode_node', 'PIPE']
+    'decode_node', 'PIPE', 'test_ssh']
 
 SYSDISTRIBUTED = os.environ.get('SYSDISTRIBUTED')
 
@@ -35,6 +35,20 @@ def execute (command, *argv,
     proc = subprocess.Popen([command] + list(argv),
         stdin=stdin, stdout=stdout, stderr=stderr)
     return proc
+
+
+
+def test_ssh (user, host, port):
+    return execute('ssh',
+        '-i', os.path.join(SYSDISTRIBUTED, 'key'),
+        '-p', str(port),
+        '%s@%s' % (user, host),
+        '-o', 'PreferredAuthentications=publickey',
+        '-o', 'IdentitiesOnly=yes',
+        'true',
+        stdout=open('/dev/null'), stderr=open('/dev/null')
+    ).wait() == 0
+
 
 
 def copy_to_node (node, fname, content, permissions=None):
